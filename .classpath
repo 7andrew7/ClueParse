@@ -2,5 +2,12 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="/opt/local/share/java/hadoop-1.1.2/hadoop-ant-1.1.2.jar"/>
+	<classpathentry kind="lib" path="/opt/local/share/java/hadoop-1.1.2/hadoop-client-1.1.2.jar"/>
+	<classpathentry kind="lib" path="/opt/local/share/java/hadoop-1.1.2/hadoop-core-1.1.2.jar"/>
+	<classpathentry kind="lib" path="/opt/local/share/java/hadoop-1.1.2/hadoop-examples-1.1.2.jar"/>
+	<classpathentry kind="lib" path="/opt/local/share/java/hadoop-1.1.2/hadoop-minicluster-1.1.2.jar"/>
+	<classpathentry kind="lib" path="/opt/local/share/java/hadoop-1.1.2/hadoop-test-1.1.2.jar"/>
+	<classpathentry kind="lib" path="/opt/local/share/java/hadoop-1.1.2/hadoop-tools-1.1.2.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
