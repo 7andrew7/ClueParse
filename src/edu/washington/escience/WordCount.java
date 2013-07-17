@@ -1,4 +1,4 @@
-package db.edu.washington.cs;
+package edu.washington.escience;
 
 import java.io.IOException;
 import java.util.Iterator;
