@@ -1,0 +1,32 @@
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+group = "edu.washington.escience"
+version = "0.1"
+
+sourceCompatibility = 1.6
+targetCompatibility = 1.6
+
+sourceSets {
+    main {
+         java.srcDir 'src'
+         output.classesDir 'build/main'
+    }
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'Process ClueWeb12 data',
+                   'Implementation-Version': version,
+                   'Main-Class': 'db.edu.washington.cs.WordCount'
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile "org.apache.hadoop:hadoop-core:1.1.2"
+    testCompile "junit:junit:4.8.2"
+}
