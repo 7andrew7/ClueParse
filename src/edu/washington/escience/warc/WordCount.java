@@ -10,24 +10,25 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
+import edu.washington.escience.util.WholeFileInputFormat;
+
 public class WordCount extends Configured implements Tool {
 
-	public static class Map extends Mapper<LongWritable, Text, Text, IntWritable> {
+	public static class Map extends Mapper<NullWritable, BytesWritable, Text, IntWritable> {
 
 		private static final IntWritable one = new IntWritable(1);
 		private Text word = new Text();
 		
 		@Override
-		public void map(LongWritable key, Text value, Context context) 
+		public void map(NullWritable key, BytesWritable value, Context context) 
 				throws IOException, InterruptedException {
-			String line = value.toString();
-			StringTokenizer tokenizer = new StringTokenizer(line);
+			String str = new String(value.getBytes(), "UTF-8");
+			StringTokenizer tokenizer = new StringTokenizer(str);
 			while (tokenizer.hasMoreTokens()) {
 				word.set(tokenizer.nextToken());
 				context.write(word, one);
@@ -60,7 +61,7 @@ public class WordCount extends Configured implements Tool {
 	    Job job = new Job(getConf());
 	    job.setJarByClass(WordCount.class);
 	    
-		job.setInputFormatClass(TextInputFormat.class);
+		job.setInputFormatClass(WholeFileInputFormat.class);
 		
 		job.setMapperClass(Map.class);
 		job.setMapOutputKeyClass(Text.class);
