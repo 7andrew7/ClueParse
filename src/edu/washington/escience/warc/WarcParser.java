@@ -1,23 +1,21 @@
 package edu.washington.escience.warc;
 
 import java.io.*;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.util.Tool;
+
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.jwat.common.HttpHeader;
 import org.jwat.common.Payload;
 import org.jwat.warc.*;
 
-public class WarcParser extends Configured implements Tool {
-	private static final String warcFile = "/scratch/warc_data/1000wb-00.warc";
+public final class WarcParser {
+	private static final String warcFile = "/scratch/warc_data/1000wb-00.warc.gz";
 	
 	private static int countLinks(InputStream is) throws Exception {
-		// XXX
 		int count = 0;
 		String str = IOUtils.toString(is, "UTF-8");
 		
@@ -33,21 +31,23 @@ public class WarcParser extends Configured implements Tool {
     public static void main(String[] args) throws Exception {
         File file = new File(warcFile);
         
-        InputStream in = new FileInputStream( file );
- 
+        // work around badness in jwat's compression handler
+        InputStream fin = new FileInputStream(file);
+        InputStream in = fin;
+        if (warcFile.endsWith(".gz"))
+        	in = new GZIPInputStream(fin);
+        
         int records = 0;
         int links = 0;
         
-        WarcReader reader = WarcReaderFactory.getReader( in );
+        WarcReader reader = WarcReaderFactory.getReaderUncompressed(in);
         WarcRecord record;
         while ( (record = reader.getNextRecord()) != null ) {
         	String targetUri = record.header.warcTargetUriStr;
         	
         	if (targetUri == null)
         		continue;
-        	
-        	HttpHeader header = record.getHttpHeader();
-        	
+        	        	
         	Payload payload = record.getPayload();
         	if (payload != null) {
         		InputStream is = payload.getInputStream();
@@ -62,9 +62,4 @@ public class WarcParser extends Configured implements Tool {
         in.close();
     }
 
-	@Override
-	public int run(String[] arg0) throws Exception {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 }
