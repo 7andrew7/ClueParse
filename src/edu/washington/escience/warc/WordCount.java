@@ -1,7 +1,6 @@
 package edu.washington.escience.warc;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configured;
