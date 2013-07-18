@@ -17,8 +17,7 @@ sourceSets {
 jar {
     manifest {
         attributes 'Implementation-Title': 'Process ClueWeb12 data',
-                   'Implementation-Version': version,
-                   'Main-Class': 'edu.washington.escience.WordCount'
+                   'Implementation-Version': version
     }
 }
 
