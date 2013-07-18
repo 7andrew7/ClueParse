@@ -1,4 +1,4 @@
-package edu.washington.escience;
+package edu.washington.escience.warc;
 
 import java.io.*;
 
