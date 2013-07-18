@@ -18,7 +18,7 @@ jar {
     manifest {
         attributes 'Implementation-Title': 'Process ClueWeb12 data',
                    'Implementation-Version': version,
-                   'Main-Class': 'db.edu.washington.cs.WordCount'
+                   'Main-Class': 'edu.washington.escience.WordCount'
     }
 }
 
@@ -28,5 +28,8 @@ repositories {
 
 dependencies {
     compile "org.apache.hadoop:hadoop-core:1.1.2"
+    compile "org.jwat:jwat-warc:1.0.0"
+    compile "org.jsoup:jsoup:1.7.2"
+
     testCompile "junit:junit:4.8.2"
 }
