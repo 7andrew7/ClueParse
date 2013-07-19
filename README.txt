@@ -23,4 +23,4 @@ First, you need to setup some classpaths:
 export LIBJARS=`./emit_libjars.py`
 export HADOOP_CLASSPATH=`echo ${LIBJARS} | sed s/,/:/g`
 
-hadoop jar ClueParse-0.1.jar edu.washington.escience.warc.WarcVertices -libjars ${LIBJARS} /datasets/clue/Disk1/ClueWeb12_00/0000wb/0000wb-00.warc.gz /output_dir/
+hadoop jar ./build/libs/ClueParse-0.1.jar edu.washington.escience.warc.WarcVertices -libjars ${LIBJARS} /input_dir /output_dir
