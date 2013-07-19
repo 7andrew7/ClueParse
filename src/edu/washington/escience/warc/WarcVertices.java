@@ -3,7 +3,6 @@ package edu.washington.escience.warc;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.StringTokenizer;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.hadoop.conf.Configured;
@@ -11,7 +10,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
@@ -25,16 +23,15 @@ import edu.washington.escience.util.WholeFileInputFormat;
 
 public class WarcVertices extends Configured implements Tool {
 
-	public static class Map extends Mapper<NullWritable, BytesWritable, Text, IntWritable > {
-
-		private static final IntWritable one = new IntWritable(1);
+	public static class Map extends Mapper<NullWritable, BytesWritable, Text, Text > {
 		
 		@Override
 		public void map(NullWritable key, BytesWritable value, Context context) 
 				throws IOException, InterruptedException {
 			ByteArrayInputStream bis = new ByteArrayInputStream(value.getBytes());
 			Text uriText = new Text();
-
+			Text idText = new Text();
+			
 			// Work around broken gzip decoder in jwat
 			InputStream in = new GZIPInputStream(bis);
 			
@@ -45,8 +42,14 @@ public class WarcVertices extends Configured implements Tool {
 		        	
 				if (targetUri == null)
 					continue;
-				uriText.set(targetUri);
-				context.write(uriText, one);
+				
+				// normalize the URI by lower-casing, stripping fragment, etc.
+				String normalizedURL = Util.normalizeURLString(targetUri, null);
+				uriText.set(normalizedURL);
+				
+				// calculate an "id", which is just part of the sha-1 hash of the URI
+				idText.set(Util.URLStringToIDString(normalizedURL));
+				context.write(idText, uriText);
 			}
 		}
 	}
