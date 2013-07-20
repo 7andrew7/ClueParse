@@ -21,6 +21,11 @@ import org.jwat.warc.WarcRecord;
 
 import edu.washington.escience.util.WholeFileInputFormat;
 
+/**
+ * Produce output lines of the form: url_id url
+ * 
+ * The url_id is a simple hash of the url
+ */
 public class WarcVertices extends Configured implements Tool {
 
 	public static class Map extends Mapper<NullWritable, BytesWritable, Text, Text > {
