@@ -10,6 +10,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
@@ -59,6 +60,18 @@ public class WarcVertices extends Configured implements Tool {
 		}
 	}
 	
+	public static class Reduce extends Reducer<Text, Text, Text, Text> {
+
+		@Override
+		public void reduce(Text id, Iterable<Text> uris, Context context)
+				throws IOException, InterruptedException {
+			for (Text uri : uris) {
+				context.write(id, uri);
+				return;
+			}
+		}
+	}
+	
 	@Override
 	public int run(String[] args) throws Exception {
 	    if (args.length != 2) {
@@ -75,18 +88,20 @@ public class WarcVertices extends Configured implements Tool {
 		
 		job.setMapperClass(Map.class);
 		job.setMapOutputKeyClass(Text.class);
-		job.setMapOutputValueClass(IntWritable.class);
+		job.setMapOutputValueClass(Text.class);
 		
 		job.setOutputKeyClass(Text.class);
-		job.setOutputValueClass(IntWritable.class);
+		job.setOutputValueClass(Text.class);
 		
+		job.setReducerClass(Reduce.class);
+		job.setNumReduceTasks(16);
+
 		job.setOutputFormatClass(TextOutputFormat.class);
-		
+	
+		System.out.println("input path: " + args[0]);
 		FileInputFormat.setInputPaths(job, new Path(args[0]));
 		FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
-		// Nothing to reduce; this ensures that our mapper's output goes to HDFS
-		job.setNumReduceTasks(0);
 		return job.waitForCompletion(true) ? 0 :  1;
 	}
 	    	
