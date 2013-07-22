@@ -18,13 +18,6 @@ public class WalkPaths extends Configured implements Tool {
 	
 	@Override
 	public int run(String[] args) throws Exception {
-	    if (args.length != 2) {
-	        System.err.printf("Usage: %s [generic options] <input> <output>\n",
-	            getClass().getSimpleName());
-	        ToolRunner.printGenericCommandUsage(System.err);
-	        return -1;
-	      }
-	    
 	    Configuration conf = this.getConf();
 	    FileSystem fs = FileSystem.get(conf);
 	    FileStatus[] status = fs.listStatus(new Path("/datasets/clue/Disk[1234]/*/*/*.warc.gz"));
