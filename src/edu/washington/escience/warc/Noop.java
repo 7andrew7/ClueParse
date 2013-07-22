@@ -54,7 +54,6 @@ public class Noop extends Configured implements Tool {
 
 		job.setOutputFormatClass(TextOutputFormat.class);
 	
-		System.out.println("input path: " + args[0]);
 		FileInputFormat.setInputPaths(job, new Path(args[0]));
 		FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
