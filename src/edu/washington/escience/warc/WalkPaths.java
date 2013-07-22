@@ -20,7 +20,7 @@ public class WalkPaths extends Configured implements Tool {
 	public int run(String[] args) throws Exception {
 	    Configuration conf = this.getConf();
 	    FileSystem fs = FileSystem.get(conf);
-	    FileStatus[] status = fs.listStatus(new Path("/datasets/clue/Disk[1234]/*/*/*.warc.gz"));
+	    FileStatus[] status = fs.listStatus(new Path(args[0]));
 	    Path[] paths = FileUtil.stat2Paths(status);
 	    
 	    for (Path path : paths) {
