@@ -94,7 +94,7 @@ public class WarcVertices extends Configured implements Tool {
 		job.setOutputValueClass(Text.class);
 		
 		job.setReducerClass(Reduce.class);
-		job.setNumReduceTasks(16);
+		job.setNumReduceTasks(0);
 
 		job.setOutputFormatClass(TextOutputFormat.class);
 	
