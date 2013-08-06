@@ -20,6 +20,7 @@ import org.jwat.warc.WarcReader;
 import org.jwat.warc.WarcReaderFactory;
 import org.jwat.warc.WarcRecord;
 
+import edu.washington.escience.util.UrlNormalizer;
 import edu.washington.escience.util.WholeFileInputFormat;
 
 /**
@@ -50,11 +51,11 @@ public class WarcVertices extends Configured implements Tool {
 					continue;
 				
 				// normalize the URI by lower-casing, stripping fragment, etc.
-				String normalizedURL = Util.normalizeURLString(targetUri, null);
+				String normalizedURL = UrlNormalizer.normalizeURLString(targetUri, null);
 				uriText.set(normalizedURL);
 				
 				// calculate an "id", which is just part of the sha-1 hash of the URI
-				idText.set(Util.URLStringToIDString(normalizedURL));
+				idText.set(UrlNormalizer.URLStringToIDString(normalizedURL));
 				context.write(idText, uriText);
 			}
 		}

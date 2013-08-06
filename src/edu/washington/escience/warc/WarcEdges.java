@@ -28,6 +28,7 @@ import org.jwat.warc.WarcReader;
 import org.jwat.warc.WarcReaderFactory;
 import org.jwat.warc.WarcRecord;
 
+import edu.washington.escience.util.UrlNormalizer;
 import edu.washington.escience.util.WholeFileInputFormat;
 
 /**
@@ -75,8 +76,8 @@ public class WarcEdges extends Configured implements Tool {
 					URL contextURL = new URL(targetUrlStr);
 					
 					// Calculate the id of the source page
-		        	String normalizedSourceUrl = Util.normalizeURLString(targetUrlStr, null);
-		        	String sourceHash = Util.URLStringToIDString(normalizedSourceUrl);
+		        	String normalizedSourceUrl = UrlNormalizer.normalizeURLString(targetUrlStr, null);
+		        	String sourceHash = UrlNormalizer.URLStringToIDString(normalizedSourceUrl);
 		        	
 		        	// Extract the set of links by parsing the HTML
 			       	Payload payload = record.getPayload();
@@ -85,8 +86,8 @@ public class WarcEdges extends Configured implements Tool {
 		        		List<String> links = getLinks(is);
 		        		for (String link : links) {
 		        			// Calculate the id of the destination page
-		        			String normalizedDestURL = Util.normalizeURLString(link, contextURL);
-		        			String destHash = Util.URLStringToIDString(normalizedDestURL);
+		        			String normalizedDestURL = UrlNormalizer.normalizeURLString(link, contextURL);
+		        			String destHash = UrlNormalizer.URLStringToIDString(normalizedDestURL);
 		        			
 		        			// Emit a (source, dest) tuple
 		        			sourceText.set(sourceHash);
