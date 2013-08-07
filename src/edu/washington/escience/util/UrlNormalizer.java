@@ -13,16 +13,6 @@ import org.apache.commons.codec.binary.Base64;
  */
 public final class UrlNormalizer {
 
-	private static MessageDigest digest = null;
-	
-	static {
-		try {
-			digest =  MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-			System.exit(1);	
-		}
-	}
 	/**
 	 * Normalize a String containing a URL:
 	 * 
@@ -49,8 +39,8 @@ public final class UrlNormalizer {
 	 * Calculate a unique ID for a normalized URL string.
 	 */
 	public static String URLStringToIDString(String urlString) {
-		digest.reset();
 		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-1");
 			digest.update(urlString.getBytes("UTF-8"));
 			byte[] fullHash = digest.digest();
 			
@@ -58,6 +48,9 @@ public final class UrlNormalizer {
 			String hashStr = Base64.encodeBase64String(fullHash);
 			return hashStr.substring(0, 12);
 		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+			System.exit(1);
+		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
