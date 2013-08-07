@@ -103,9 +103,7 @@ public final class GraphExtractor extends Configured implements Tool {
 			}
 		}
 		
-		public Void do_call(Reader reader) throws Exception {
-	    	long startTime = System.currentTimeMillis();
-
+		public void do_call(Reader reader) throws Exception {
 	    	Path path = stat.getPath();
 	    	Text sourceUrlText = new Text();
 	    	Text jsonText = new Text();
@@ -171,10 +169,8 @@ public final class GraphExtractor extends Configured implements Tool {
 	    		vertex_out.println(record.toString());
 	    	} // foreach web page
 	    	
-	    	long duration = System.currentTimeMillis() - startTime;
-	    	System.out.printf("[%f] %s\n", (double)duration / 1000, path.toString()); 
-			return null;
-		}
+	    	System.out.printf("[%f] %s\n", (float)System.currentTimeMillis() / 1000, path.toString()); 
+	    }
 	}
 	
 	@Override
