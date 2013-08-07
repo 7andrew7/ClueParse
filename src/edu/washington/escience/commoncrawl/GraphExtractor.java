@@ -29,6 +29,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 import edu.washington.escience.util.UrlNormalizer;
 
 public final class GraphExtractor extends Configured implements Tool {
@@ -76,15 +79,27 @@ public final class GraphExtractor extends Configured implements Tool {
 			this.stat = stat;			
 		}
 		
+
 		/**
 		 * Process all the records (web pages) in a single metadata file
 		 */
 		@Override
 		public Void call() throws Exception {
+	    	Path path = stat.getPath();
+			Reader reader = null;
+			try {
+		    	reader = new SequenceFile.Reader(fs_in, path, conf);
+		    	return do_call(reader);
+			} finally {
+				if (reader != null)
+					reader.close();
+			}
+		}
+		
+		public Void do_call(Reader reader) throws Exception {
 	    	long startTime = System.currentTimeMillis();
 
 	    	Path path = stat.getPath();
-	    	Reader reader = new SequenceFile.Reader(fs_in, path, conf);
 	    	Text sourceUrlText = new Text();
 	    	Text jsonText = new Text();
 	    	URL source_url = null;
@@ -149,10 +164,8 @@ public final class GraphExtractor extends Configured implements Tool {
 	    		vertex_out.println(record.toString());
 	    	} // foreach web page
 	    	
-	    	reader.close();
-	    	
 	    	long duration = System.currentTimeMillis() - startTime;
-	    	System.out.printf("[%f] %s\n", (double)duration / 1000, sourceUrlText.toString()); 
+	    	System.out.printf("[%f] %s\n", (double)duration / 1000, path.toString()); 
 			return null;
 		}
 	}
@@ -209,6 +222,7 @@ public final class GraphExtractor extends Configured implements Tool {
 	}
 
 	public static void main(String[] args) throws Exception {
+		Logger.getRootLogger().setLevel(Level.WARN);
 		int exitCode = ToolRunner.run(new GraphExtractor(), args);
 		System.exit(exitCode);
 	}

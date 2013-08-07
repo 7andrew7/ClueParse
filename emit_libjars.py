@@ -5,7 +5,8 @@ import glob
 import sys
 
 DEPENDENCIES = ['jsoup-1.7.2.jar', 'jwat-gzip-1.0.0.jar',
-                'jwat-common-1.0.0.jar', 'jwat-warc-1.0.0.jar', 'gson-2.2.4.jar']
+                'jwat-common-1.0.0.jar', 'jwat-warc-1.0.0.jar', 'gson-2.2.4.jar',
+                'log4j-1.2.17.jar']
 
 GRADLE_ROOT = os.path.expanduser('~/.gradle')
 
