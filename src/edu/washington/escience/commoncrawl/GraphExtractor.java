@@ -169,7 +169,7 @@ public final class GraphExtractor extends Configured implements Tool {
 	    		vertex_out.println(record.toString());
 	    	} // foreach web page
 	    	
-	    	System.out.printf("[%f] %s\n", (float)System.currentTimeMillis() / 1000, path.toString()); 
+	    	System.out.printf("[%d] %s\n", System.currentTimeMillis() / 1000, path.toString()); 
 	    }
 	}
 	
