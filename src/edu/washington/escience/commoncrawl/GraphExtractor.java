@@ -4,8 +4,13 @@ import java.io.BufferedWriter;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.conf.Configuration;
@@ -54,8 +59,108 @@ public final class GraphExtractor extends Configured implements Tool {
 		return elem.getAsString();
 	}
 	
+	
+	public static final class FileProcessor implements Callable<Void> {
+
+		private final FileSystem fs_in;
+		private final Configuration conf;
+		private final PrintWriter vertex_out;
+		private final PrintWriter edge_out;
+		private final FileStatus stat;
+
+		public FileProcessor(FileSystem fs_in, Configuration conf, PrintWriter vertex_out, PrintWriter edge_out, FileStatus stat) {
+			this.fs_in = fs_in;
+			this.conf = conf;
+			this.vertex_out = vertex_out;
+			this.edge_out = edge_out;
+			this.stat = stat;			
+		}
+		
+		/**
+		 * Process all the records (web pages) in a single metadata file
+		 */
+		@Override
+		public Void call() throws Exception {
+	    	long startTime = System.currentTimeMillis();
+
+	    	Path path = stat.getPath();
+	    	Reader reader = new SequenceFile.Reader(fs_in, path, conf);
+	    	Text sourceUrlText = new Text();
+	    	Text jsonText = new Text();
+	    	URL source_url = null;
+	 	    	
+	    	while (reader.next(sourceUrlText, jsonText)) { // foreach web page...
+	    		VertexRecord record = new VertexRecord();
+
+	    		// normalize the URL, extract its hash
+	    		try {
+					record.normalizedURLStr = UrlNormalizer.normalizeURLString(sourceUrlText.toString(), null);
+		    		record.hash = UrlNormalizer.URLStringToIDString(record.normalizedURLStr);
+		    		source_url = new URL(sourceUrlText.toString());
+				} catch (MalformedURLException e1) {
+					e1.printStackTrace();
+					continue;
+				}
+
+	    		// Extract the content JSON blob
+	    		JsonParser jsonParser = new JsonParser();
+	    		JsonObject jsonObj = jsonParser.parse(jsonText.toString()).getAsJsonObject();
+	    		
+	    		String disp = getStringJsonMember(jsonObj, "disposition");
+	    		if (disp == null || disp.equals("FAILURE")) {
+	    			record.success = false;
+	    			record.failure_reason = getStringJsonMember(jsonObj, "failure_reason");
+	    			record.failure_detail = getStringJsonMember(jsonObj, "failure_detail");
+	    		} else {
+	    			record.success = true;
+	    			record.http_result = getStringJsonMember(jsonObj, "http_result");
+	    			record.http_mime_type = getStringJsonMember(jsonObj, "mime_type");
+	    			record.http_content_length = getStringJsonMember(jsonObj, "content_len");
+	    			
+	    			JsonObject content = jsonObj.getAsJsonObject("content");
+	    			if (content != null) {
+		    			record.cc_content_type = getStringJsonMember(content, "type");
+	    		
+		    			// Iterate over the array of links in the content object
+		    			JsonArray links = content.getAsJsonArray("links");
+		    			if (links != null) {	    		
+		    				for (JsonElement elem : links) {
+		    					JsonObject link = elem.getAsJsonObject();
+		    					String linkType = link.get("type").getAsString();
+		    					if (linkType == null)
+		    						continue;
+		    					if (!linkType.equals("a"))
+		    						continue;
+		    					
+		    					String linkUrlStr = link.get("href").getAsString();
+		    					String normalizedLinkUrlStr;
+								try {
+									normalizedLinkUrlStr = UrlNormalizer.normalizeURLString(linkUrlStr, source_url);
+			    					String dest_hash = UrlNormalizer.URLStringToIDString(normalizedLinkUrlStr);			    	    			
+			    					edge_out.println(record.hash + "\t" + dest_hash);
+
+								} catch (MalformedURLException e) {
+									// skip badly formed URLs
+								}
+		    				} // foreach link
+		    			}
+	    			}
+	    		}
+	    		vertex_out.println(record.toString());
+	    	} // foreach web page
+	    	
+	    	reader.close();
+	    	
+	    	long duration = System.currentTimeMillis() - startTime;
+	    	System.out.printf("[%f] %s\n", (double)duration / 1000, sourceUrlText.toString()); 
+			return null;
+		}
+	}
+	
 	@Override
 	public int run(String[] args) throws Exception {
+		long startTime = System.currentTimeMillis();
+		
 		Configuration conf = this.getConf();
 		
 	    String inputPath = "file:///scratch/cc_data/raw/metadata-01849";
@@ -82,81 +187,24 @@ public final class GraphExtractor extends Configured implements Tool {
 
 	    System.out.println("Found " + status.length + " metadata files");
 
-	    int count = 0;
-    	int goodPages = 0;
-    	int failedPages = 0;
-    	int numLinks = 0;
-
+    	ExecutorService executor = Executors.newFixedThreadPool(8);
 	    for (FileStatus stat: status) {
-	    	count++;
-	    	Path path = stat.getPath();
-	    	System.out.printf("[%d/%d %f%%] %s\n", count, status.length, 100 * ((float)count/ status.length), path); 
-	    			
-	    	Reader reader = new SequenceFile.Reader(fs_in, path, conf);
-	    	Text sourceUrlText = new Text();
-	    	Text jsonText = new Text();
-
-	    	while (reader.next(sourceUrlText, jsonText)) { // foreach web page...
-	    		VertexRecord record = new VertexRecord();
-
-	    		// normalize the URL, extract its hash
-	    		record.normalizedURLStr = UrlNormalizer.normalizeURLString(sourceUrlText.toString(), null);
-	    		record.hash = UrlNormalizer.URLStringToIDString(record.normalizedURLStr);
-	    		URL source_url = new URL(sourceUrlText.toString());
-
-	    		// Extract the content JSON blob
-	    		JsonParser jsonParser = new JsonParser();
-	    		JsonObject jsonObj = jsonParser.parse(jsonText.toString()).getAsJsonObject();
-	    		
-	    		String disp = getStringJsonMember(jsonObj, "disposition");
-	    		if (disp == null || disp.equals("FAILURE")) {
-	    			failedPages++;
-	    			record.success = false;
-	    			record.failure_reason = getStringJsonMember(jsonObj, "failure_reason");
-	    			record.failure_detail = getStringJsonMember(jsonObj, "failure_detail");
-	    		} else {
-	    			goodPages++;
-	    			record.success = true;
-	    			record.http_result = getStringJsonMember(jsonObj, "http_result");
-	    			record.http_mime_type = getStringJsonMember(jsonObj, "mime_type");
-	    			record.http_content_length = getStringJsonMember(jsonObj, "content_len");
-	    			
-	    			JsonObject content = jsonObj.getAsJsonObject("content");
-	    			if (content != null) {
-		    			record.cc_content_type = getStringJsonMember(content, "type");
-	    		
-		    			// Iterate over the array of links in the content object
-		    			JsonArray links = content.getAsJsonArray("links");
-		    			if (links != null) {	    		
-		    				for (JsonElement elem : links) {
-		    					JsonObject link = elem.getAsJsonObject();
-		    					String linkType = link.get("type").getAsString();
-		    					if (linkType == null)
-		    						continue;
-		    					if (!linkType.equals("a"))
-		    						continue;
-		    					
-		    					String linkUrlStr = link.get("href").getAsString();
-		    					String normalizedLinkUrlStr = UrlNormalizer.normalizeURLString(linkUrlStr, source_url);
-		    					String dest_hash = UrlNormalizer.URLStringToIDString(normalizedLinkUrlStr);
-	    			
-		    					edge_out.println(record.hash + "\t" + dest_hash);
-		    					numLinks++;
-		    				} // foreach link
-		    			}
-	    			}
-	    		}
-    			vertex_out.println(record.toString());
-	    	} // foreach webpage
-	    	
-	    	vertex_out.close();
-	    	vertex_os.close();
-	    	edge_out.close();
-	    	edge_os.close();
-	    	reader.close();
+	    	executor.submit(new FileProcessor(fs_in, conf, vertex_out, edge_out, stat));
 	   }
+
+	    System.out.println("Waiting for task completion...");
 	    
-	    System.out.println("SUCCESS: " + goodPages + " FAILURES: " + failedPages + " links: " + numLinks);
+	    executor.shutdown();
+	    executor.awaitTermination(1, TimeUnit.DAYS);
+	    
+    	vertex_out.close();
+    	vertex_os.close();
+    	edge_out.close();
+    	edge_os.close();
+
+    	long duration = System.currentTimeMillis() - startTime;
+    	System.out.printf("  => Total time: %f seconds\n", (double)duration / 1000); 
+
 	    return 0;
 	}
 
