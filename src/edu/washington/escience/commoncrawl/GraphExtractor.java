@@ -1,6 +1,7 @@
 package edu.washington.escience.commoncrawl;
 
 import java.io.BufferedWriter;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -63,7 +64,7 @@ public final class GraphExtractor extends Configured implements Tool {
 	}
 	
 	
-	public static final class FileProcessor implements Callable<Void> {
+	public static final class FileProcessor implements Runnable {
 
 		private final FileSystem fs_in;
 		private final Configuration conf;
@@ -84,15 +85,22 @@ public final class GraphExtractor extends Configured implements Tool {
 		 * Process all the records (web pages) in a single metadata file
 		 */
 		@Override
-		public Void call() throws Exception {
+		public void run() {
 	    	Path path = stat.getPath();
 			Reader reader = null;
 			try {
 		    	reader = new SequenceFile.Reader(fs_in, path, conf);
-		    	return do_call(reader);
+		    	do_call(reader);
+			} catch (Exception ex) {
+				ex.printStackTrace();
 			} finally {
-				if (reader != null)
-					reader.close();
+				if (reader != null) {
+					try {
+						reader.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
 			}
 		}
 		
