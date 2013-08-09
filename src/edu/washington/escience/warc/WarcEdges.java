@@ -3,6 +3,7 @@ package edu.washington.escience.warc;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
@@ -104,12 +106,19 @@ public class WarcEdges extends Configured implements Tool {
 	
 	@Override
 	public int run(String[] args) throws Exception {
-	    if (args.length != 2) {
-	        System.err.printf("Usage: %s [generic options] <input> <output>\n",
-	            getClass().getSimpleName());
-	        ToolRunner.printGenericCommandUsage(System.err);
-	        return -1;
-	      }
+		String inputPath = "/scratch/warc_data/1000wb-00.warc.gz";
+		String outputPath = "/scratch/warc_data/processed/edges";
+		
+		if (args.length >= 1)
+			inputPath = args[0];
+		if (args.length >= 2)
+			outputPath = args[1];
+		
+		System.out.println("input: " + inputPath);
+		System.out.println("output: " + outputPath);
+
+	    FileSystem fs = FileSystem.get(new URI(outputPath), getConf());
+		fs.delete(new Path(outputPath), true);
 	    
 	    Job job = new Job(getConf());
 	    job.setJarByClass(WarcEdges.class);
@@ -125,8 +134,8 @@ public class WarcEdges extends Configured implements Tool {
 		
 		job.setOutputFormatClass(TextOutputFormat.class);
 		
-		FileInputFormat.setInputPaths(job, new Path(args[0]));
-		FileOutputFormat.setOutputPath(job, new Path(args[1]));
+		FileInputFormat.setInputPaths(job, new Path(inputPath));
+		FileOutputFormat.setOutputPath(job, new Path(outputPath));
 
 		// Nothing to reduce; this ensures that our mapper's output goes to HDFS
 		job.setNumReduceTasks(0);
