@@ -3,11 +3,9 @@ package edu.washington.escience.warc;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
@@ -88,9 +86,6 @@ public class WarcVertices extends Configured implements Tool {
 		System.out.println("input: " + inputPath);
 		System.out.println("output: " + outputPath);
 
-	    FileSystem fs = FileSystem.get(new URI(outputPath), getConf());
-		fs.delete(new Path(outputPath), true);
-		
 	    Job job = new Job(getConf());
 	    job.setJarByClass(WarcVertices.class);
 	    

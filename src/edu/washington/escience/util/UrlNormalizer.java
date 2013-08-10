@@ -64,7 +64,7 @@ public final class UrlNormalizer {
 		System.out.println(normalizeURLString("index.html?blah#sam", new URL("http://www.cs.washington.edu:8080/foo?bar#slouch")));
 		System.out.println(normalizeURLString("#local", new URL("http://www.cs.washington.edu:8080/foo?bar#slouch")));
 		System.out.println(normalizeURLString("http://cnn.com", null));
-		System.out.println(normalizeURLString("http://cnn.com/", null));
+		System.out.println(normalizeURLString("http://cnn.com/index.html", null));
 			
 		System.out.println(URLStringToIDString("foo.bar.com/index.html?blah"));
 		System.out.println(URLStringToIDString("A"));
