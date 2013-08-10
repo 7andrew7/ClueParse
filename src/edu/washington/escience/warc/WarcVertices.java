@@ -44,19 +44,24 @@ public class WarcVertices extends Configured implements Tool {
 			
 			WarcReader reader = WarcReaderFactory.getReaderUncompressed(in);
 			WarcRecord record;
-			while ( (record = reader.getNextRecord()) != null ) {
-				String targetUri = record.header.warcTargetUriStr;
+			
+			try {
+				while ( (record = reader.getNextRecord()) != null ) {
+					String targetUri = record.header.warcTargetUriStr;
 		        	
-				if (targetUri == null)
-					continue;
+					if (targetUri == null)
+						continue;
 				
-				// normalize the URI by lower-casing, stripping fragment, etc.
-				String normalizedURL = UrlNormalizer.normalizeURLString(targetUri, null);
-				uriText.set(normalizedURL);
+					// normalize the URI by lower-casing, stripping fragment, etc.
+					String normalizedURL = UrlNormalizer.normalizeURLString(targetUri, null);
+					uriText.set(normalizedURL);
 				
-				// calculate an "id", which is just part of the sha-1 hash of the URI
-				idText.set(UrlNormalizer.URLStringToIDString(normalizedURL));
-				context.write(idText, uriText);
+					// calculate an "id", which is just part of the sha-1 hash of the URI
+					idText.set(UrlNormalizer.URLStringToIDString(normalizedURL));
+					context.write(idText, uriText);				
+				}
+			} catch(Exception e) {
+				e.printStackTrace();
 			}
 		}
 	}
@@ -99,7 +104,7 @@ public class WarcVertices extends Configured implements Tool {
 		job.setOutputValueClass(Text.class);
 		
 		job.setReducerClass(Reduce.class);
-		job.setNumReduceTasks(0);
+		job.setNumReduceTasks(16);
 
 		job.setOutputFormatClass(TextOutputFormat.class);
 	
