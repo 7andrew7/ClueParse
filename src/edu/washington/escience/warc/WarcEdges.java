@@ -14,6 +14,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
@@ -38,6 +39,8 @@ import edu.washington.escience.util.WholeFileInputFormat;
  */
 public class WarcEdges extends Configured implements Tool {
 
+	static enum CounterTypes { BAD_RECORD };
+	
 	private static List<String> getLinks(InputStream is) throws IOException {
 		List<String> links = new ArrayList<String>();
 		String str = IOUtils.toString(is, "UTF-8");
@@ -65,39 +68,52 @@ public class WarcEdges extends Configured implements Tool {
 			
 			WarcReader reader = WarcReaderFactory.getReaderUncompressed(in);
 			WarcRecord record;
-			while ( (record = reader.getNextRecord()) != null ) {
-				// Extract the URL of the source page
-				String targetUrlStr = record.header.warcTargetUriStr;
-				if (targetUrlStr == null)
-					continue;
-
-				try {
+			
+			try {
+				while ( (record = reader.getNextRecord()) != null ) {
+					// Extract the URL of the source page
+					String targetUrlStr = record.header.warcTargetUriStr;
+					if (targetUrlStr == null)
+						continue;
+	
 					// Create a URL object for the source page; this is used to normalize relative references
 					URL contextURL = new URL(targetUrlStr);
-					
+						
 					// Calculate the id of the source page
-		        	String normalizedSourceUrl = UrlNormalizer.normalizeURLString(targetUrlStr, null);
-		        	String sourceHash = UrlNormalizer.URLStringToIDString(normalizedSourceUrl);
-		        	
-		        	// Extract the set of links by parsing the HTML
-			       	Payload payload = record.getPayload();
-		        	if (payload != null) {
-		        		InputStream is = payload.getInputStream();
-		        		List<String> links = getLinks(is);
-		        		for (String link : links) {
-		        			// Calculate the id of the destination page
-		        			String normalizedDestURL = UrlNormalizer.normalizeURLString(link, contextURL);
-		        			String destHash = UrlNormalizer.URLStringToIDString(normalizedDestURL);
-		        			
-		        			// Emit a (source, dest) tuple
-		        			sourceText.set(sourceHash);
-		        			destText.set(destHash);		        		
-		    				context.write(sourceText, destText);
-		        		}
-		        	}
-				} catch(IOException ioe) {
-					// increment error count?
-				}							
+					String normalizedSourceUrl = UrlNormalizer.normalizeURLString(targetUrlStr, null);
+					String sourceHash = UrlNormalizer.URLStringToIDString(normalizedSourceUrl);
+			        	
+					// Extract the set of links by parsing the HTML
+					Payload payload = record.getPayload();
+					if (payload != null) {
+						InputStream is = payload.getInputStream();
+						List<String> links = getLinks(is);
+						for (String link : links) {
+							// Calculate the id of the destination page
+							String normalizedDestURL = UrlNormalizer.normalizeURLString(link, contextURL);
+							String destHash = UrlNormalizer.URLStringToIDString(normalizedDestURL);
+			        			
+							// Emit a (source, dest) tuple
+							sourceText.set(sourceHash);
+							destText.set(destHash);		        		
+							context.write(sourceText, destText);
+						}
+			        }
+				}
+			} catch(Exception ex) {
+				context.getCounter(CounterTypes.BAD_RECORD).increment(1);
+				ex.printStackTrace();
+			}
+		}
+	}
+	
+	public static class Reduce extends Reducer<Text, Text, Text, Text> {
+
+		@Override
+		public void reduce(Text source, Iterable<Text> dests, Context context)
+				throws IOException, InterruptedException {
+			for (Text dest : dests) {
+				context.write(source, dest);
 			}
 		}
 	}
@@ -122,18 +138,19 @@ public class WarcEdges extends Configured implements Tool {
 		
 		job.setMapperClass(Map.class);
 		job.setMapOutputKeyClass(Text.class);
-		job.setMapOutputValueClass(IntWritable.class);
+		job.setMapOutputValueClass(Text.class);
 		
 		job.setOutputKeyClass(Text.class);
-		job.setOutputValueClass(IntWritable.class);
+		job.setOutputValueClass(Text.class);
 		
+		job.setReducerClass(Reduce.class);
+		job.setNumReduceTasks(16);
+
 		job.setOutputFormatClass(TextOutputFormat.class);
 		
 		FileInputFormat.setInputPaths(job, new Path(inputPath));
 		FileOutputFormat.setOutputPath(job, new Path(outputPath));
 
-		// Nothing to reduce; this ensures that our mapper's output goes to HDFS
-		job.setNumReduceTasks(0);
 		return job.waitForCompletion(true) ? 0 :  1;
 	}
 	    	
