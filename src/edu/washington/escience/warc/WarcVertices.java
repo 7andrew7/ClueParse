@@ -1,23 +1,18 @@
 package edu.washington.escience.warc;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.zip.GZIPInputStream;
 
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.jwat.warc.WarcReader;
-import org.jwat.warc.WarcReaderFactory;
+
 import org.jwat.warc.WarcRecord;
 
 import edu.washington.escience.util.UrlNormalizer;
@@ -30,38 +25,28 @@ import edu.washington.escience.util.WholeFileInputFormat;
  */
 public class WarcVertices extends Configured implements Tool {
 
-	public static class Map extends Mapper<NullWritable, BytesWritable, Text, Text > {
+	static enum CounterTypes {BAD_SOURCE_URL};
+	
+	public static class Map extends WarcMapper {
 		
 		@Override
-		public void map(NullWritable key, BytesWritable value, Context context) 
-				throws IOException, InterruptedException {
-			ByteArrayInputStream bis = new ByteArrayInputStream(value.getBytes());
-			Text uriText = new Text();
-			Text idText = new Text();
-			
-			// Work around broken gzip decoder in jwat
-			InputStream in = new GZIPInputStream(bis);
-			
-			WarcReader reader = WarcReaderFactory.getReaderUncompressed(in);
-			WarcRecord record;
+		public void processRecord(WarcRecord record, Context context) {			
+			String targetUri = record.header.warcTargetUriStr;        	
+			if (targetUri == null)
+				return;
 			
 			try {
-				while ( (record = reader.getNextRecord()) != null ) {
-					String targetUri = record.header.warcTargetUriStr;
-		        	
-					if (targetUri == null)
-						continue;
+				Text uriText = new Text();
+				Text idText = new Text();
+				String normalizedURL = UrlNormalizer.normalizeURLString(targetUri, null);
 				
-					// normalize the URI by lower-casing, stripping fragment, etc.
-					String normalizedURL = UrlNormalizer.normalizeURLString(targetUri, null);
-					uriText.set(normalizedURL);
+				uriText.set(normalizedURL);				
+				idText.set(UrlNormalizer.URLStringToIDString(normalizedURL));
 				
-					// calculate an "id", which is just part of the sha-1 hash of the URI
-					idText.set(UrlNormalizer.URLStringToIDString(normalizedURL));
-					context.write(idText, uriText);				
-				}
-			} catch(Exception e) {
+				context.write(idText, uriText);
+			} catch (Exception e) {
 				e.printStackTrace();
+				context.getCounter(CounterTypes.BAD_SOURCE_URL).increment(1);
 			}
 		}
 	}
