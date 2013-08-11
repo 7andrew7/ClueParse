@@ -33,6 +33,9 @@ class WholeFileRecordReader extends RecordReader<NullWritable, BytesWritable> {
 		if (!processed) {
 			byte[] contents = new byte[(int) fileSplit.getLength()];
 			Path file = fileSplit.getPath();
+			
+			System.out.println("Procesing path: " + file);
+			
 			FileSystem fs = file.getFileSystem(conf);
 			FSDataInputStream in = null;
 			try {
