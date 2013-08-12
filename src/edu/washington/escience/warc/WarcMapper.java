@@ -16,7 +16,7 @@ import org.jwat.warc.WarcRecord;
 
 public abstract class WarcMapper extends Mapper<NullWritable, BytesWritable, Text, Text> {
 
-	static enum WarcMapperError { RECORD_READ_FAILURE };
+	static enum WarcMapperError { RECORD_READ_FAILURE, DECOMPRESSION_FAILURE };
 	
 	@Override
 	public void map(NullWritable key, BytesWritable value, Context context) 
@@ -35,7 +35,13 @@ public abstract class WarcMapper extends Mapper<NullWritable, BytesWritable, Tex
 				if (record == null)
 					return;
 				processRecord(record, context);
-			} catch (Exception ex) {
+			}
+			catch (java.util.zip.ZipException zipEx) {
+				zipEx.printStackTrace();
+				context.getCounter(WarcMapperError.DECOMPRESSION_FAILURE).increment(1);
+				return;
+			}
+			catch (Exception ex) {			
 				ex.printStackTrace();
 				context.getCounter(WarcMapperError.RECORD_READ_FAILURE).increment(1);
 				continue;
