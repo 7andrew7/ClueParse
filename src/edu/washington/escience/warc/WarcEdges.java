@@ -148,8 +148,8 @@ public class WarcEdges extends Configured implements Tool {
 		job.setOutputKeyClass(Text.class);
 		job.setOutputValueClass(Text.class);
 		
-		job.setReducerClass(Reduce.class);
-		job.setNumReduceTasks(16);
+		//job.setReducerClass(Reduce.class);
+		job.setNumReduceTasks(0);
 
 		job.setOutputFormatClass(TextOutputFormat.class);
 		
