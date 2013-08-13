@@ -1,53 +1,68 @@
 package edu.washington.escience.warc;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.zip.GZIPInputStream;
+import java.net.URL;
 
-import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.jwat.warc.WarcReader;
-import org.jwat.warc.WarcReaderFactory;
-import org.jwat.warc.WarcRecord;
 
+import edu.umd.cloud9.collection.clue.ClueWarcRecord;
+import edu.washington.escience.util.UrlNormalizer;
 
-public abstract class WarcMapper extends Mapper<NullWritable, BytesWritable, Text, Text> {
+public abstract class WarcMapper extends Mapper<LongWritable, ClueWarcRecord, Text, Text> {
 
-	static enum WarcMapperError { RECORD_READ_FAILURE, DECOMPRESSION_FAILURE };
+	static enum CounterTypes { PAGES, ERROR_MISSING_TARGET, ERROR_PAGE_TOO_LARGE, ERROR_BAD_SOURCE_URL };
 	
+	private static final int LARGE_PAGE_SIZE = 4 * 1024*1024;
+
 	@Override
-	public void map(NullWritable key, BytesWritable value, Context context) 
+	public void map(LongWritable key, ClueWarcRecord record, Context context) 
 			throws IOException, InterruptedException {
-		ByteArrayInputStream bis = new ByteArrayInputStream(value.getBytes());
-		
-		// Work around broken gzip decoder in jwat
-		InputStream in = new GZIPInputStream(bis);
-		
-		WarcReader reader = WarcReaderFactory.getReaderUncompressed(in);
-		WarcRecord record = null;
-		
-		while (true) {
-			try {
-				record = reader.getNextRecord();
-				if (record == null)
-					return;
-				processRecord(record, context);
-			}
-			catch (java.util.zip.ZipException zipEx) {
-				zipEx.printStackTrace();
-				context.getCounter(WarcMapperError.DECOMPRESSION_FAILURE).increment(1);
-				return;
-			}
-			catch (Exception ex) {			
-				ex.printStackTrace();
-				context.getCounter(WarcMapperError.RECORD_READ_FAILURE).increment(1);
-				continue;
-			}
+		String targetUrlStr = record.getHeaderMetadataItem("WARC-Target-URI");       	
+		if (targetUrlStr == null) {
+			context.getCounter(CounterTypes.ERROR_MISSING_TARGET).increment(1);
+			return;			
 		}
+		
+		byte[] content = record.getByteContent();
+		
+		 // Large pages cause jsoup to go out to lunch...
+		if (content.length > LARGE_PAGE_SIZE) {
+			context.getCounter(CounterTypes.ERROR_PAGE_TOO_LARGE).increment(1);
+			return;
+		}
+
+		context.getCounter(CounterTypes.PAGES).increment(1);
+		
+		URL contextURL = null;
+		String normalizedSourceUrlStr = null;
+		String sourceHash = null;
+		
+		try {
+			// Create a URL object for the source page; this is used to normalize relative references
+			contextURL = new URL(targetUrlStr);
+				
+			// Calculate the id of the source page
+			normalizedSourceUrlStr = UrlNormalizer.normalizeURLString(targetUrlStr, null);
+			sourceHash = UrlNormalizer.URLStringToIDString(normalizedSourceUrlStr);
+		} catch(Exception ioe) {
+			ioe.printStackTrace();
+			context.getCounter(CounterTypes.ERROR_BAD_SOURCE_URL).increment(1);
+			return;
+		}
+		
+		processRecord(content, contextURL, normalizedSourceUrlStr, sourceHash, context);
 	}
 	
-	public abstract void processRecord(WarcRecord record, Context context);
+	/**
+	 * Process a WARC record
+	 * 
+	 * @param content: The content of the WARC record as a byte array
+	 * @param sourceURL: The URL of the record
+	 * @param normalizedSourceUrlStr: A normalized version of the URL, in string form
+	 * @param sourceUrlStrHash: A hashed version of the normalized URL
+	 */
+	public abstract void processRecord(byte []content, URL sourceURL, String normalizedSourceUrlStr,
+			String sourceUrlStrHash, Context context) throws IOException, InterruptedException;
 }

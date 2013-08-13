@@ -1,12 +1,12 @@
 package edu.washington.escience.warc;
 
 import java.io.IOException;
+import java.net.URL;
 
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -15,8 +15,6 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 import edu.umd.cloud9.collection.clue.ClueWarcInputFormat;
-import edu.umd.cloud9.collection.clue.ClueWarcRecord;
-import edu.washington.escience.util.UrlNormalizer;
 
 /**
  * Produce output lines of the form: url_id url
@@ -25,31 +23,20 @@ import edu.washington.escience.util.UrlNormalizer;
  */
 public class WarcVertices extends Configured implements Tool {
 
-	static enum CounterTypes {PAGES, BAD_SOURCE_URL};
+	static enum CounterTypes {PAGES, LARGE_PAGES, BAD_SOURCE_URL};
 	
-	public static class Map extends Mapper<LongWritable, ClueWarcRecord, Text, Text> {
-				
+	public static class Map extends WarcMapper {				
 		@Override
-		public void map(LongWritable key, ClueWarcRecord record, Context context) 
-				throws IOException, InterruptedException {
-			String targetUri = record.getHeaderMetadataItem("WARC-Target-URI");       	
-			if (targetUri == null)
-				return;
+		public void processRecord(byte[] content, URL sourceURL,
+				String normalizedSourceUrlStr, String sourceUrlStrHash, Context context) 
+						throws IOException, InterruptedException {
+			Text idText = new Text();
+			Text uriText = new Text();
+
+			idText.set(sourceUrlStrHash);
+			uriText.set(normalizedSourceUrlStr);
 			
-			try {
-				Text uriText = new Text();
-				Text idText = new Text();
-				String normalizedURL = UrlNormalizer.normalizeURLString(targetUri, null);
-				
-				uriText.set(normalizedURL);				
-				idText.set(UrlNormalizer.URLStringToIDString(normalizedURL));
-				
-				context.write(idText, uriText);
-				context.getCounter(CounterTypes.PAGES).increment(1);
-			} catch (Exception e) {
-				e.printStackTrace();
-				context.getCounter(CounterTypes.BAD_SOURCE_URL).increment(1);
-			}
+			context.write(idText, uriText);
 		}
 	}
 	

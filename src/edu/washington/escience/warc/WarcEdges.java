@@ -9,21 +9,19 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.log4j.Logger;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-
 import edu.umd.cloud9.collection.clue.ClueWarcInputFormat;
-import edu.umd.cloud9.collection.clue.ClueWarcRecord;
 import edu.washington.escience.util.UrlNormalizer;
 
 /**
@@ -33,8 +31,8 @@ import edu.washington.escience.util.UrlNormalizer;
  */
 public class WarcEdges extends Configured implements Tool {
 
-	static enum CounterTypes {PAGES, LINKS, BAD_SOURCE_URL, BAD_DEST_URL , PAYLOAD_PARSE_ERROR};
-	
+	private static final Logger logger = Logger.getLogger(WarcEdges.class);
+		
 	private static List<String> getLinks(String str) throws IOException {
 		List<String> links = new ArrayList<String>();
 		
@@ -47,64 +45,44 @@ public class WarcEdges extends Configured implements Tool {
 		return links;		
 	}
 	
-	public static class Map extends Mapper<LongWritable, ClueWarcRecord, Text, Text> {
+	public static class Map extends WarcMapper {
+		static enum CounterTypes {LINKS, ERROR_PAYLOAD_PARSE, ERROR_BAD_DEST_URL};
 		
 		@Override
-		public void map(LongWritable key, ClueWarcRecord record, Context context) 
+		public void processRecord(byte[] content, URL sourceURL,
+				String normalizedSourceUrlStr, String sourceUrlStrHash,	Context context)
 				throws IOException, InterruptedException {
-			String targetUrlStr = record.getHeaderMetadataItem("WARC-Target-URI");       	
-			if (targetUrlStr == null)
-				return;
-			
-			Text sourceText = new Text();
-			Text destText = new Text();
-	
-			URL contextURL = null;
-			String normalizedSourceUrlStr = null;
-			String sourceHash = null;
-				
-			try {
-				// Create a URL object for the source page; this is used to normalize relative references
-				contextURL = new URL(targetUrlStr);
-					
-				// Calculate the id of the source page
-				normalizedSourceUrlStr = UrlNormalizer.normalizeURLString(targetUrlStr, null);
-				sourceHash = UrlNormalizer.URLStringToIDString(normalizedSourceUrlStr);
-			} catch(Exception ioe) {
-				ioe.printStackTrace();
-				context.getCounter(CounterTypes.BAD_SOURCE_URL).increment(1);
-				return;
-			}
-			
-			context.getCounter(CounterTypes.PAGES).increment(1);
 			
 			// Extract the set of links by parsing the HTML
 			List<String> links = null;
 			try {
-				byte[] content = record.getByteContent();
 				String contentStr = new String(content, "UTF-8");				
 				links = getLinks(contentStr);
 			} catch(Exception ex) {
 				ex.printStackTrace();
-				context.getCounter(CounterTypes.PAYLOAD_PARSE_ERROR).increment(1);
+				context.getCounter(CounterTypes.ERROR_PAYLOAD_PARSE).increment(1);
 				return;
 			}
 			
+			Text sourceText = new Text();
+			Text destText = new Text();
+
 			for (String link : links) {
 				try {
 					// Calculate the id of the destination page
-					String normalizedDestURL = UrlNormalizer.normalizeURLString(link, contextURL);
+					String normalizedDestURL = UrlNormalizer.normalizeURLString(link, sourceURL);
 					String destHash = UrlNormalizer.URLStringToIDString(normalizedDestURL);
 					
 					// Emit a (source, dest) tuple
-					sourceText.set(sourceHash);
+					sourceText.set(sourceUrlStrHash);
 					destText.set(destHash);		        		
 					context.write(sourceText, destText);
 					
 					context.getCounter(CounterTypes.LINKS).increment(1);
 
 				} catch (Exception ex) {
-					context.getCounter(CounterTypes.BAD_DEST_URL).increment(1);
+					// This happens all the time, due to javascript link targets...
+					context.getCounter(CounterTypes.ERROR_BAD_DEST_URL).increment(1);
 					continue;
 				}
 			} // foreach link
@@ -132,8 +110,8 @@ public class WarcEdges extends Configured implements Tool {
 		if (args.length >= 2)
 			outputPath = args[1];
 		
-		System.out.println("input: " + inputPath);
-		System.out.println("output: " + outputPath);
+		logger.info("input: " + inputPath);
+		logger.info("output: " + outputPath);
 	    
 	    Job job = new Job(getConf());
 	    job.setJarByClass(WarcEdges.class);
