@@ -6,6 +6,7 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -13,10 +14,9 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import org.jwat.warc.WarcRecord;
-
+import edu.umd.cloud9.collection.clue.ClueWarcInputFormat;
+import edu.umd.cloud9.collection.clue.ClueWarcRecord;
 import edu.washington.escience.util.UrlNormalizer;
-import edu.washington.escience.util.WholeFileInputFormat;
 
 /**
  * Produce output lines of the form: url_id url
@@ -25,13 +25,14 @@ import edu.washington.escience.util.WholeFileInputFormat;
  */
 public class WarcVertices extends Configured implements Tool {
 
-	static enum CounterTypes {BAD_SOURCE_URL};
+	static enum CounterTypes {PAGES, BAD_SOURCE_URL};
 	
-	public static class Map extends WarcMapper {
-		
+	public static class Map extends Mapper<LongWritable, ClueWarcRecord, Text, Text> {
+				
 		@Override
-		public void processRecord(WarcRecord record, Context context) {			
-			String targetUri = record.header.warcTargetUriStr;        	
+		public void map(LongWritable key, ClueWarcRecord record, Context context) 
+				throws IOException, InterruptedException {
+			String targetUri = record.getHeaderMetadataItem("WARC-Target-URI");       	
 			if (targetUri == null)
 				return;
 			
@@ -44,6 +45,7 @@ public class WarcVertices extends Configured implements Tool {
 				idText.set(UrlNormalizer.URLStringToIDString(normalizedURL));
 				
 				context.write(idText, uriText);
+				context.getCounter(CounterTypes.PAGES).increment(1);
 			} catch (Exception e) {
 				e.printStackTrace();
 				context.getCounter(CounterTypes.BAD_SOURCE_URL).increment(1);
@@ -66,7 +68,7 @@ public class WarcVertices extends Configured implements Tool {
 	@Override
 	public int run(String[] args) throws Exception {
 		String inputPath = "/scratch/warc_data/1000wb-00.warc.gz";
-		String outputPath = "/scratch/warc_data/processed/vertexes";
+		String outputPath = "/scratch/warc_data/processed/vertexes2";
 		
 		if (args.length >= 1)
 			inputPath = args[0];
@@ -79,7 +81,7 @@ public class WarcVertices extends Configured implements Tool {
 	    Job job = new Job(getConf());
 	    job.setJarByClass(WarcVertices.class);
 	    
-		job.setInputFormatClass(WholeFileInputFormat.class);
+		job.setInputFormatClass(ClueWarcInputFormat.class);
 		
 		job.setMapperClass(Map.class);
 		job.setMapOutputKeyClass(Text.class);

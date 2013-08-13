@@ -31,5 +31,6 @@ dependencies {
     compile "org.jsoup:jsoup:1.7.2"
     compile "com.google.code.gson:gson:2.2.4"
     compile "log4j:log4j:1.2.17"
+    compile "edu.umd:cloud9:1.4.17"
     testCompile "junit:junit:4.8.2"
 }

@@ -1,16 +1,15 @@
 package edu.washington.escience.warc;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -21,11 +20,11 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.jwat.common.Payload;
-import org.jwat.warc.WarcRecord;
 
+
+import edu.umd.cloud9.collection.clue.ClueWarcInputFormat;
+import edu.umd.cloud9.collection.clue.ClueWarcRecord;
 import edu.washington.escience.util.UrlNormalizer;
-import edu.washington.escience.util.WholeFileInputFormat;
 
 /**
  * Produce an edge table of the form:
@@ -34,11 +33,10 @@ import edu.washington.escience.util.WholeFileInputFormat;
  */
 public class WarcEdges extends Configured implements Tool {
 
-	static enum CounterTypes {BAD_SOURCE_URL, BAD_DEST_URL , PAYLOAD_PARSE_ERROR};
+	static enum CounterTypes {PAGES, LINKS, BAD_SOURCE_URL, BAD_DEST_URL , PAYLOAD_PARSE_ERROR};
 	
-	private static List<String> getLinks(InputStream is) throws IOException {
+	private static List<String> getLinks(String str) throws IOException {
 		List<String> links = new ArrayList<String>();
-		String str = IOUtils.toString(is, "UTF-8");
 		
 		Document doc = Jsoup.parse(str);
 		Elements elems = doc.select("a[href]"); // a with href
@@ -49,17 +47,17 @@ public class WarcEdges extends Configured implements Tool {
 		return links;		
 	}
 	
-	public static class Map extends WarcMapper {
+	public static class Map extends Mapper<LongWritable, ClueWarcRecord, Text, Text> {
 		
 		@Override
-		public void processRecord(WarcRecord record, Context context) {
-			Text sourceText = new Text();
-			Text destText = new Text();
-			
-			// Extract the URL of the source page
-			String targetUrlStr = record.header.warcTargetUriStr;
+		public void map(LongWritable key, ClueWarcRecord record, Context context) 
+				throws IOException, InterruptedException {
+			String targetUrlStr = record.getHeaderMetadataItem("WARC-Target-URI");       	
 			if (targetUrlStr == null)
 				return;
+			
+			Text sourceText = new Text();
+			Text destText = new Text();
 	
 			URL contextURL = null;
 			String normalizedSourceUrlStr = null;
@@ -77,17 +75,15 @@ public class WarcEdges extends Configured implements Tool {
 				context.getCounter(CounterTypes.BAD_SOURCE_URL).increment(1);
 				return;
 			}
-									       
+			
+			context.getCounter(CounterTypes.PAGES).increment(1);
+			
 			// Extract the set of links by parsing the HTML
-			Payload payload = record.getPayload();
-			if (payload == null)
-				return;
-							
-			InputStream is = payload.getInputStream();
 			List<String> links = null;
-				
 			try {
-				links = getLinks(is);
+				byte[] content = record.getByteContent();
+				String contentStr = new String(content, "UTF-8");				
+				links = getLinks(contentStr);
 			} catch(Exception ex) {
 				ex.printStackTrace();
 				context.getCounter(CounterTypes.PAYLOAD_PARSE_ERROR).increment(1);
@@ -104,6 +100,9 @@ public class WarcEdges extends Configured implements Tool {
 					sourceText.set(sourceHash);
 					destText.set(destHash);		        		
 					context.write(sourceText, destText);
+					
+					context.getCounter(CounterTypes.LINKS).increment(1);
+
 				} catch (Exception ex) {
 					context.getCounter(CounterTypes.BAD_DEST_URL).increment(1);
 					continue;
@@ -126,7 +125,7 @@ public class WarcEdges extends Configured implements Tool {
 	@Override
 	public int run(String[] args) throws Exception {
 		String inputPath = "/scratch/warc_data/1000wb-00.warc.gz";
-		String outputPath = "/scratch/warc_data/processed/edges";
+		String outputPath = "/scratch/warc_data/processed/edges2";
 		
 		if (args.length >= 1)
 			inputPath = args[0];
@@ -139,7 +138,7 @@ public class WarcEdges extends Configured implements Tool {
 	    Job job = new Job(getConf());
 	    job.setJarByClass(WarcEdges.class);
 	    
-		job.setInputFormatClass(WholeFileInputFormat.class);
+	    job.setInputFormatClass(ClueWarcInputFormat.class);
 		
 		job.setMapperClass(Map.class);
 		job.setMapOutputKeyClass(Text.class);
