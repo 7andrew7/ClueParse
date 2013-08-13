@@ -21,7 +21,7 @@ public final class WarcParser {
 		
 		Document doc = Jsoup.parse(str);
 		Elements links = doc.select("a[href]"); // a with href
-		for (Element link : links) {
+		for (@SuppressWarnings("unused") Element link : links) {
 			count++;
 		}	
 		

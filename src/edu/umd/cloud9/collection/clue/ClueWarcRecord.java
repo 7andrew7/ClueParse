@@ -61,9 +61,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.Map.Entry;
 
-import edu.umd.cloud9.collection.Indexable;
-
-public class ClueWarcRecord extends Indexable {
+public class ClueWarcRecord {
 
 	public static String WARC_VERSION = "WARC/1.0";
 	public static String WARC_VERSION_LINE = "WARC/1.0\n";
